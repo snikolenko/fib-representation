@@ -5,6 +5,7 @@ from operator import itemgetter
 import glob,re,argparse,datetime,os,os.path,json
 import shlex
 from subprocess import Popen, PIPE
+from multiprocessing import Pool
 
 def my_print(s):
     print("[" + str(datetime.datetime.now()) + "] " + s)
@@ -68,9 +69,26 @@ def get_exitcode_stdout_stderr(cmd):
     exitcode = proc.returncode
     return exitcode, out, err
 
-input_dir = "data_test" # args.data
-my_print("Processing FIBs from directory %s/..." % input_dir)
-for in_fname in glob.glob('%s/*.txt' % input_dir):
+def print_one_table(outf, res_ks, comment, value_func):
+    outf.write("%% %s\n\n" % comment)
+    for k in res_ks:
+        outf.write(" % ".join(value_func(results[k])) + " \\\\\n")
+    outf.write("\n\n")
+
+def get_omr(v, prefix, egress=True):
+    res = [
+        v[prefix + " 1gr wid"],
+        v[prefix + " 1gr I"],
+        v[prefix + " 1gr D"],
+        v[prefix + " 1gr size"],
+        v[prefix + " #gr"],
+        v[prefix + " size"]
+    ]
+    if egress:
+        res += [ v[prefix + " egress size"] ]
+    return res
+
+def process_one_file(in_fname):
     my_print("%s" % in_fname)
     if (not os.path.exists(in_fname[:-4] + '.TX.div.tmp')) or (not os.path.exists(in_fname[:-4] + '.RX.0.tmp')) or (not os.path.exists(in_fname[:-4] + '.RX.1.tmp')):
         my_print("\t...divided egress FIBs do not (all) exist, recreating...")
@@ -86,26 +104,17 @@ for in_fname in glob.glob('%s/*.txt' % input_dir):
                 result[arr[0]] = arr[1]
         with open("%s.res.json" % in_fname[:-4], 'w') as outf:
             json.dump(result, outf)
-
-def print_one_table(outf, res_ks, comment, value_func):
-    outf.write("%% %s\n\n" % comment)
-    for k in res_ks:
-        outf.write(" % ".join(value_func(results[k])) + " \\\\\n")
-    outf.write("\n\n")
-
-def get_omr(v, prefix):
-    return [
-        v[prefix + " 1gr wid"],
-        v[prefix + " 1gr I"],
-        v[prefix + " 1gr D"],
-        v[prefix + " 1gr size"],
-        v[prefix + " #gr"],
-        v[prefix + " size"],
-        v[prefix + " egress size"]
-    ]
+        my_print("\t...experiments done and dumped to %s.res.json." % in_fname[:-4])
 
 if __name__ == "__main__":
     out_file = args.out
+    threadpool = Pool(args.threads)
+
+
+    input_dir = "data_test" # args.data
+    my_print("Processing FIBs from directory %s/ in %d threads..." % (input_dir, args.threads) )
+    threadpool.map(process_one_file, glob.glob('%s/*.txt' % input_dir))
+
     my_print("All FIBs processed, reading results and compiling LaTeX tables in %s..." % out_file)
     results = {}
     for in_fname in glob.glob('%s/*.txt' % input_dir):
@@ -117,7 +126,8 @@ if __name__ == "__main__":
                 v["Original actions"], v["Original rules"], v["Original size"],
                 v["1-stage Boolean rules"], v["1-stage Boolean size"],
                 v["2-stage ingress orig rules"], v["2-stage ingress orig size"],
-                v["Total divided egress rules"], v["Total divided egress size"]
+                v["Egress 0 Bool rules"] + v["Egress 1 Bool rules"],
+                v["Egress 0 Bool size"] + v["Egress 1 Bool size"]
                 ])
 
         print_one_table(outf, res_ks, "Table II. Equivalent FIB representations: one-stage ingress, filter-order ind., false positive check on egress (Fig. 3a); two-stage forwarding, RX action-order ind., TX lookup (Fig. 3b); two stage forwarding, RX non-confl. rules and TX lookup (Fig. 3c).",
@@ -130,8 +140,10 @@ if __name__ == "__main__":
         print_one_table(outf, res_ks, "Table III. Non-equivalent FIB representations: one-stage, RX action-order ind., no check on egress; (Fig. 4a); two-stage, RX action-order ind., TX action-order ind. lookup; (Fig. 4b); two-stage, RX non-confl. rules, TX action-order ind. lookup (Fig. 4c).",
             lambda v : 
                 get_omr(v, "1-stage RX action, TX none") + 
-                get_omr(v, "2-stage RX action") + 
-                get_omr(v, "2-stage RX nonconfl")
+                get_omr(v, "2-stage RX action", egress=False) + 
+                [ str(float(v["Divided egress 0 size"]) + float(v["Divided egress 1 size"])) ] +
+                get_omr(v, "2-stage RX nonconfl", egress=False) +
+                [ str(float(v["Divided egress 0 size"]) + float(v["Divided egress 1 size"])) ]
             )
 
         print_one_table(outf, res_ks, "Table IV. Summary table: ingress, egress, and total classifier size for all FIB representations.",
@@ -149,13 +161,13 @@ if __name__ == "__main__":
                 v["2-stage RX nonconfl size"],
                 v["2-stage RX nonconfl egress size"],
                 str(float(v["2-stage RX nonconfl size"]) + float(v["2-stage RX nonconfl egress size"])),
-                v["1-stage RX action, TX none size"],
+                str(float(v["1-stage RX action, TX none size"]) + float(v["1-stage RX action, TX none egress size"])),
                 v["2-stage RX action size"],
-                v["2-stage RX action egress size"],
-                str(float(v["2-stage RX action size"]) + float(v["2-stage RX action egress size"])),
+                str(float(v["Divided egress 0 size"]) + float(v["Divided egress 1 size"])),
+                str(float(v["2-stage RX action size"]) + float(v["Divided egress 0 size"]) + float(v["Divided egress 1 size"])),
                 v["2-stage RX nonconfl size"],
-                v["2-stage RX nonconfl egress size"],
-                str(float(v["2-stage RX nonconfl size"]) + float(v["2-stage RX nonconfl egress size"])),
+                str(float(v["Divided egress 0 size"]) + float(v["Divided egress 1 size"])),
+                str(float(v["2-stage RX nonconfl size"]) + float(v["Divided egress 0 size"]) + float(v["Divided egress 1 size"])),
             ])
 
 

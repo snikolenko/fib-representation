@@ -150,6 +150,8 @@ void process_file_allmodes(const string & fname, int num_bits_toremove = -1) {
 		vector<string> action_strings_egress_0;
 		read_nsdi_file(egress0_fname, input_br_egress_0, actions_egress_0, action_strings_egress_0);
 		apply_binary_rules(input_br_egress_0);
+		print_result("Egress 0 Bool rules", input_br_egress_0.size());
+		print_result_float("Egress 0 Bool size", get_size_round(input_br_egress_0.size(), NSDI_BOOL_SIZE));
 		OneModeResult omr_egress_4_0 = process_one_mode(input_br_egress_0, 1, -1);
 		print_OMR("Divided egress 0", omr_egress_4_0);
 
@@ -158,8 +160,10 @@ void process_file_allmodes(const string & fname, int num_bits_toremove = -1) {
 		vector<string> action_strings_egress_1;
 		read_nsdi_file(egress1_fname, input_br_egress_1, actions_egress_1, action_strings_egress_1);
 		apply_binary_rules(input_br_egress_1);
+		print_result("Egress 0 Bool rules", input_br_egress_1.size());
+		print_result_float("Egress 0 Bool size", get_size_round(input_br_egress_1.size(), NSDI_BOOL_SIZE));
 		OneModeResult omr_egress_4_1 = process_one_mode(input_br_egress_1, 1, -1);
-		print_OMR("Divided egress 0", omr_egress_4_1);
+		print_OMR("Divided egress 1" , omr_egress_4_1);
 		
 		print_result("Total divided egress rules", input_br_egress_0.size() + input_br_egress_1.size());
 		print_result_float("Total divided egress size", get_size_round(input_br_egress_0.size() + input_br_egress_1.size(), NSDI_BOOL_SIZE));
