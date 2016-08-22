@@ -4,7 +4,7 @@ Simulation code for efficient FIB representations
 In order to build the basic program `reduce_fib`, you have to have boost libraries installed; e.g., on an Ubuntu system run
 ```
 sudo apt-get install libboost-dev libboost-random-dev libboost-system-dev libboost-program-options-dev libboost-filesystem-dev libboost-date-time-dev
-'''
+```
 
 Then, to produce the tables similar to ICNP 2016 submission, run
 ```
