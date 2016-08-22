@@ -10,4 +10,4 @@ bin/reduce_fib: src/reduce_fib.cpp src/reduce_fib.hpp $(UTIL) src/rules.hpp
 	$(CC) $(CFLAGS) src/reduce_fib.cpp $(LIB) -o bin/reduce_fib
 
 clean:
-	rm -rf bin/*
+	rm -rf bin/reduce_fib

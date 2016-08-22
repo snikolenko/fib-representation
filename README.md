@@ -6,7 +6,12 @@ In order to build the basic program `reduce_fib`, you have to have boost librari
 sudo apt-get install libboost-dev libboost-random-dev libboost-system-dev libboost-program-options-dev libboost-filesystem-dev libboost-date-time-dev
 ```
 
-Then, to produce the tables similar to ICNP 2016 submission, run
+After that, compile the basic program by running
+```
+make
+```
+
+Then, to produce LaTeX tables similar to ICNP 2016 submission, run
 ```
 python3 run_icnp2016.py -i data -t 8
 ```
