@@ -105,14 +105,15 @@ def process_one_file(in_fname):
         with open("%s.res.json" % in_fname[:-4], 'w') as outf:
             json.dump(result, outf)
         my_print("\t...experiments done and dumped to %s.res.json." % in_fname[:-4])
+    return 0
 
 if __name__ == "__main__":
     out_file = args.out
-    threadpool = Pool(args.threads)
+    num_threads = int(args.threads)
+    threadpool = Pool(num_threads)
 
-
-    input_dir = "data_test" # args.data
-    my_print("Processing FIBs from directory %s/ in %d threads..." % (input_dir, args.threads) )
+    input_dir = args.data
+    my_print("Processing FIBs from directory %s/ in %d threads..." % (input_dir, num_threads) )
     threadpool.map(process_one_file, glob.glob('%s/*.txt' % input_dir))
 
     my_print("All FIBs processed, reading results and compiling LaTeX tables in %s..." % out_file)
