@@ -54,9 +54,9 @@ template <typename T> int MMPPoissonPacketGenerator<T>::gen_n_packets() {
 	else return pg_off.gen_n_packets();
 }
 
-template <typename T> vector<Packet<T> > MMPPVectorPoissonPacketGenerator<T>::internal_gen_packets() {
+template <typename T, typename L> vector<Packet<T> > MMPPVectorPoissonPacketGenerator<T, L>::internal_gen_packets() {
 	vector<Packet<T> > res;
-	for (typename vector<MMPPoissonPacketGenerator<T> *>::iterator it = v.begin(); it != v.end(); ++it) {
+	for (typename vector<L *>::iterator it = v.begin(); it != v.end(); ++it) {
 		vector<Packet<T> > current_res = (*it)->internal_gen_packets();
 		res.insert(res.end(), current_res.begin(), current_res.end());
 	}
@@ -64,7 +64,10 @@ template <typename T> vector<Packet<T> > MMPPVectorPoissonPacketGenerator<T>::in
 	return res;
 }
 
-template class MMPPVectorPoissonPacketGenerator<int>;
 template class MMPPoissonPacketGenerator<int>;
+template class MMPPVectorPoissonPacketGenerator<int, MMPPoissonPacketGenerator<int> >;
+template class MMPPVectorPoissonPacketGenerator<int, MMPPoissonBiasedPacketGenerator<int> >;
+template class MMPPVectorPoissonPacketGenerator<int, MMPPoissonTwoValuedBiasedPacketGenerator<int> >;
+template class MMPPVectorPoissonPacketGenerator<int, MMPPoissonTwoValuedUniformPacketGenerator<int> >;
 template class PoissonPacketGenerator<int>;
 template class PacketGenerator<int>;

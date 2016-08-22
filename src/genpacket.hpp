@@ -9,8 +9,12 @@
 #define GENPACKET_HPP_
 
 #include <vector>
+#include <random>
 #include <boost/random.hpp>
-#include <boost/random/uniform_int_distribution.hpp>
+#include <boost/random/uniform_int.hpp>
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/uniform_real.hpp>
+#include <boost/random/variate_generator.hpp>
 #include <boost/random/poisson_distribution.hpp>
 #include <boost/random/variate_generator.hpp>
 #include <boost/random/mersenne_twister.hpp>
@@ -108,20 +112,54 @@ public:
 
 int get_random_int(int min, int max);
 
+
 template <typename T> class MMPPoissonPacketGenerator : public PacketGenerator<T> {
 public:
 	MMPPoissonPacketGenerator<T>( int ik, double swprob, double swbprob, double loff, double lon) : PacketGenerator<T>(ik),
-			k(ik), L(1), on(false), switch_prob(swprob), switch_back_prob(swbprob), pg_on(ik, lon), pg_off(ik, loff), gen(42u) {};
+			k(ik), L(1), on(false), switch_prob(swprob), switch_back_prob(swbprob), pg_on(ik, lon), pg_off(ik, loff), gen(time(0))
+			{
+				vector<double> probs(ik);
+				double lambda = 1 / (double)ik;
+				double rest = 1.0;
+				probs[0] = lambda;
+				for (int i=1; i<ik-1; ++i) {
+					probs[i] = (1-lambda) * probs[i-1];
+					rest -= probs[i];
+				}
+				probs[ik-1] = rest;
+				// for (uint i=0; i<ik; ++i) {
+				// 	cout << "\t" << probs[i] << "\n";
+				// }
+				port_distr = std::discrete_distribution<>(probs.begin(), probs.end());
+			};
 	MMPPoissonPacketGenerator<T>( int ik, int iL, double swprob, double swbprob, double loff, double lon) : PacketGenerator<T>(ik, iL),
-			k(ik), L(1), on(false), switch_prob(swprob), switch_back_prob(swbprob), pg_on(ik, lon), pg_off(ik, loff), gen(42u) {
-				// cout << "\tgenerated MMPP\n";
+			k(ik), L(iL), on(false), switch_prob(swprob), switch_back_prob(swbprob), pg_on(ik, lon), pg_off(ik, loff), gen(time(0))
+			{
+				vector<double> probs(ik);
+				double lambda = 2 / (double)(ik);
+				double rest = 1.0;
+				probs[0] = lambda;
+				for (int i=1; i<ik-1; ++i) {
+					probs[i] = (1-lambda) * probs[i-1];
+					rest -= probs[i];
+				}
+				probs[ik-1] = rest;
+				port_distr = std::discrete_distribution<>(probs.begin(), probs.end());
+				// for (uint i=0; i<ik; ++i) {
+				// 	cout << "\t" << probs[i];
+				// }
+				// cout << "\n";
+				// for (uint i=0; i<ik; ++i) {
+				// 	cout << "\t" << port_distr(gen);
+				// }
+				// cout << "\n";
 			};
 
 	int gen_n_packets();
 
 	virtual Packet<T> gen_packet() {
+		// int kk = (k == 1) ? 1 : (port_distr(gen)+1);
 		int kk = (k == 1) ? 1 : get_random_int(1, k);
-		// cout << "\n\tgenerated " << kk << "\n";
 		int ll = (L == 1) ? 1 : get_random_int(1, L);
 		Packet<T> p = Packet<T>( kk, ll );
 		return p;
@@ -134,27 +172,80 @@ public:
 	PoissonPacketGenerator<T> pg_on;
 	PoissonPacketGenerator<T> pg_off;
 	boost::mt19937 gen;
+	std::discrete_distribution<> port_distr;
+};
+
+template <typename T> class MMPPoissonBiasedPacketGenerator : public MMPPoissonPacketGenerator<T> {
+public:
+	MMPPoissonBiasedPacketGenerator<T>( int ik, double swprob, double swbprob, double loff, double lon)
+		: MMPPoissonPacketGenerator<T>(ik, swprob, swbprob, loff, lon) { };
+	MMPPoissonBiasedPacketGenerator<T>( int ik, int iL, double swprob, double swbprob, double loff, double lon)
+		: MMPPoissonPacketGenerator<T>(ik, iL, swprob, swbprob, loff, lon) { };
+
+	virtual Packet<T> gen_packet() {
+		int ll = (this->L == 1) ? 1 : get_random_int(1, this->L);
+		int kk = 1;
+		if (this->k > 1) {
+			int randint = get_random_int(1, this->k * (this->k + 1) / 2);
+			int cumul = this->k;
+			for (uint i=1; i<=this->k; ++i) {
+				if (randint <= cumul) {
+					kk = i; break;
+				}
+				cumul += this->k - i;
+			}
+			// cout << "k=" << this->k << "\trandint=" << randint << "\tres=" << kk << "\n";
+		} 
+		Packet<T> p = Packet<T>( kk, ll );
+		return p;
+	}
+};
+
+template <typename T> class MMPPoissonTwoValuedBiasedPacketGenerator : public MMPPoissonPacketGenerator<T> {
+public:
+	MMPPoissonTwoValuedBiasedPacketGenerator<T>( int ik, double swprob, double swbprob, double loff, double lon)
+		: MMPPoissonPacketGenerator<T>(ik, swprob, swbprob, loff, lon) { };
+	MMPPoissonTwoValuedBiasedPacketGenerator<T>( int ik, int iL, double swprob, double swbprob, double loff, double lon)
+		: MMPPoissonPacketGenerator<T>(ik, iL, swprob, swbprob, loff, lon) { };
+
+	virtual Packet<T> gen_packet() {
+		int kk = (this->k == 1) ? 1 : ( (get_random_int(1, this->k) == 1) ? this->k : 1);
+		int ll = (this->L == 1) ? 1 : get_random_int(1, this->L);
+		Packet<T> p = Packet<T>( kk, ll );
+		return p;
+	}
+};
+
+template <typename T> class MMPPoissonTwoValuedUniformPacketGenerator : public MMPPoissonPacketGenerator<T> {
+public:
+	MMPPoissonTwoValuedUniformPacketGenerator<T>( int ik, double swprob, double swbprob, double loff, double lon)
+		: MMPPoissonPacketGenerator<T>(ik, swprob, swbprob, loff, lon) { };
+	MMPPoissonTwoValuedUniformPacketGenerator<T>( int ik, int iL, double swprob, double swbprob, double loff, double lon)
+		: MMPPoissonPacketGenerator<T>(ik, iL, swprob, swbprob, loff, lon) { };
+
+	virtual Packet<T> gen_packet() {
+		int kk = (this->k == 1) ? 1 : ( (get_random_int(1, 2) == 2) ? this->k : 1);
+		int ll = (this->L == 1) ? 1 : get_random_int(1, this->L);
+		Packet<T> p = Packet<T>( kk, ll );
+		return p;
+	}
 };
 
 
-template <typename T> class MMPPVectorPoissonPacketGenerator : public PacketGenerator<T> {
+template <typename T, typename L = MMPPoissonPacketGenerator<T> > class MMPPVectorPoissonPacketGenerator : public PacketGenerator<T> {
 public:
-	MMPPVectorPoissonPacketGenerator<T>( int ik, double swprob, double swbprob, double loff, double lon, int n ) : PacketGenerator<T>(ik),
+	MMPPVectorPoissonPacketGenerator<T, L>( int ik, double swprob, double swbprob, double loff, double lon, int n ) : PacketGenerator<T>(ik),
 			on(false), switch_prob(swprob), switch_back_prob(swbprob), lambda_off(loff), lambda_on(lon), nstreams(n) {
 		initVector();
 	};
-	MMPPVectorPoissonPacketGenerator <T>( int ik, int iL, double swprob, double swbprob, double loff, double lon, int n ) : PacketGenerator<T>(ik, iL),
+	MMPPVectorPoissonPacketGenerator<T, L>( int ik, int iL, double swprob, double swbprob, double loff, double lon, int n ) : PacketGenerator<T>(ik, iL),
 			on(false), switch_prob(swprob), switch_back_prob(swbprob), lambda_off(loff), lambda_on(lon), nstreams(n) {
 		initVector();
 	};
 
 	void initVector() {
 		for (int i=0; i < nstreams; ++i) {
-			// int cur_k = i % this->k + 1;
-			// int cur_L = (i / this->k) % this->L + 1;
-			// cout << "Stream " << i << ":  k=" << cur_k << "\tL=" << cur_L << endl;
-			// v.push_back(new MMPPoissonPacketGenerator<T>(cur_k, cur_L, switch_prob, switch_back_prob, lambda_off, lambda_on));
-			v.push_back(new MMPPoissonPacketGenerator<T>(this->k, this->L, switch_prob, switch_back_prob, lambda_off, lambda_on));
+			v.push_back(new L(this->k, this->L, switch_prob, switch_back_prob, lambda_off, lambda_on));
 		}
 	}
 
@@ -162,7 +253,7 @@ public:
 
 	vector<Packet<T> > internal_gen_packets();
 
-	vector<MMPPoissonPacketGenerator<T> *> v;
+	vector<L *> v;
 	bool on;
 	double switch_prob;
 	double switch_back_prob;
