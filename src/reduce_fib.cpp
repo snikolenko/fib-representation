@@ -33,6 +33,7 @@ void print_result_float(const string & key, double value) {
 typedef struct  {
 	uint num_rules_final, num_rules_1group, width_1group, I_1group, D_1group, num_groups;
 	float size_final, size_1group, egress_fpcheck_size;
+	vector<uint> widths, Is, Ds;
 } OneModeResult;
 
 
@@ -44,6 +45,11 @@ void print_OMR(const string & prefix, const OneModeResult & omr) {
 	print_result(prefix + " #gr", omr.num_groups);
 	print_result_float(prefix + " size", omr.size_final);
 	print_result_float(prefix + " egress size", omr.egress_fpcheck_size);
+	for (uint i=0; i < omr.widths.size(); ++i) {
+		cout << prefix << " " << (i+1) << "g wid" << "\t" << omr.widths[i] << "\n";
+		cout << prefix << " " << (i+1) << "g I" << "\t" << omr.Is[i] << "\n";
+		cout << prefix << " " << (i+1) << "g D" << "\t" << omr.Ds[i] << "\n";
+	}
 }
 
 OneModeResult process_one_mode(const vector<NSDIRule> & input_br, uint mode, int num_bits_toremove) {
@@ -68,6 +74,9 @@ OneModeResult process_one_mode(const vector<NSDIRule> & input_br, uint mode, int
 	res.width_1group = NSDI_BOOL_SIZE-num_removed_bits;
 	res.I_1group = cur_subset_i_numrules;
 	res.D_1group = cur_subset_d_numrules;
+	res.widths.push_back(NSDI_BOOL_SIZE-num_removed_bits);
+	res.Is.push_back(cur_subset_i_numrules);
+	res.Ds.push_back(cur_subset_d_numrules);
 	res.size_1group = egress_fpcheck_size / 1000.;
 	for (uint numIter=0; numIter<1000; ++numIter) {
 		vector<NSDIRule> cur_br;
@@ -87,6 +96,10 @@ OneModeResult process_one_mode(const vector<NSDIRule> & input_br, uint mode, int
 		egress_fpcheck_size += (NSDI_BOOL_SIZE - cur_removed_bits) * cur_subset_i_numrules;
 		cur_size = cur_size - (prev_subset_d_numrules - cur_subset_d_numrules)*num_removed_bits;
 		prev_subset_d_numrules = cur_subset_d_numrules;
+
+		res.widths.push_back(NSDI_BOOL_SIZE-cur_removed_bits);
+		res.Is.push_back(cur_subset_i_numrules);
+		res.Ds.push_back(cur_subset_d_numrules);
 
 		if (cur_subset_d_numrules == 0) {
 			if (numGroups == 0) numGroups = numIter+1;
