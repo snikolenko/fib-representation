@@ -16,6 +16,7 @@ bool randomize_and_output = false;
 bool read_binary = false;
 
 uint D_size = 0;
+uint beta = 0;
 int mode = 1;
 
 void print_result(const string & key, const string & value) {
@@ -139,7 +140,7 @@ typedef struct  {
 	std::vector<int> group_ids;
 } AllGroupsResult;
 
-void print_AGR(const AllGroupsResult & res) {
+void print_AGR(const AllGroupsResult & res, bool print_groupids = false) {
 	cout << "#rules:\t";
 	for (uint i=0; i<res.num_rules.size(); ++i) {
 		cout << res.num_rules[i] << " ";
@@ -159,6 +160,14 @@ void print_AGR(const AllGroupsResult & res) {
 		}
 		cout << endl;
 	}
+
+	if (print_groupids) {
+		cout << "gr_ids:\t";
+		for (uint i=0; i<res.group_ids.size(); ++i) {
+			cout << res.group_ids[i];
+		}
+		cout << endl;
+	}
 }
 
 AllGroupsResult	recompute_groups(const vector<NSDIRule> & input_br, uint bits_toremove, int mode = 1) {
@@ -172,10 +181,10 @@ AllGroupsResult	recompute_groups(const vector<NSDIRule> & input_br, uint bits_to
 	}
 
 	for (uint iGroup=0; iGroup<1000; ++iGroup) {
-		cout << "Processing " << cur_br.size() << " rules, removing " << bits_toremove << " bits" << "...\n";
+		// cout << "Processing " << cur_br.size() << " rules, removing " << bits_toremove << " bits" << "...\n";
 		OneOptGroupResult ogres = process_one_optgroup_L(cur_br, bits_toremove, mode, false, true);
-		cout << "Group " << iGroup << ":\n";
-		print_OGR(ogres, cur_br);
+		// cout << "Group " << iGroup << ":\n";
+		// print_OGR(ogres, cur_br);
 
 		// add the current group to AllGroupsResult
 		res.group_bits.push_back( ogres.group_bits );
@@ -206,7 +215,7 @@ AllGroupsResult	recompute_groups(const vector<NSDIRule> & input_br, uint bits_to
 
 // uint 
 
-uint add_rule_to_groups(const NSDIRule & r, vector<NSDIRule> & br, vector<NSDIRule> & D_set, AllGroupsResult & agr, uint bits_toremove, uint mode = 1) {
+uint add_rule_to_groups(const NSDIRule & r, vector<NSDIRule> & br, vector<NSDIRule> & D_set, AllGroupsResult & agr, uint bits_toremove, uint mode = 1, uint max_D_size=0) {
 	// check if we can add the new rule to one of the groups
 	// cout << "Adding rule\n" << r.print() << endl;
 	for (uint iGroup=0; iGroup < agr.group_bits.size(); ++iGroup) {
@@ -226,21 +235,59 @@ uint add_rule_to_groups(const NSDIRule & r, vector<NSDIRule> & br, vector<NSDIRu
 			br.push_back(r);
 			agr.num_rules[iGroup] += 1;
 			agr.group_ids.push_back(iGroup);
+			// cout << "\t\tadding to group " << iGroup << "...";
+			// print_AGR(agr, true);
 			return 0;
 		}
 	}
 	// if couldn't add, try to leave in D
-	if (D_set.size() < D_size) {
+	if (D_set.size() < max_D_size) {
 		D_set.push_back(r);
 		return 0;
 	}
 	// if couldn't, recompute everything
-	cout << "Recomputing everything! D_set size = " << D_set.size() << endl;
+	// cout << "Recomputing everything! D_set size = " << D_set.size() << endl;
 	br.push_back(r);
 	br.insert(br.end(), D_set.begin(), D_set.end());
 	agr = recompute_groups(br, bits_toremove);
-	print_AGR(agr);
+	// print_AGR(agr);
 	return 1;
+}
+
+uint get_recomputations(const vector<NSDIRule> & input_br, uint beta, uint max_width, uint max_D_size) {
+	int bits_toremove = -1;
+	if (max_width > -1) {
+		bits_toremove = NSDI_BOOL_SIZE - max_width;
+	}
+
+	vector<NSDIRule> br;
+	for (uint i=input_br.size() - 100; i<input_br.size(); ++i) {
+		br.push_back(input_br[i]);
+	}
+
+	AllGroupsResult agr = recompute_groups(br, bits_toremove);
+	if (agr.group_bits.size() < beta) {
+		for (uint iGroup=agr.group_bits.size(); iGroup < beta; ++iGroup) {
+			vector<bool> new_groupbits(NSDI_BOOL_SIZE, false);
+			for (uint i=0; i<max_width; ++i) {
+				new_groupbits[i] = true;
+			}
+			agr.group_bits.push_back(new_groupbits);
+			agr.widths.push_back(max_width);
+			agr.num_rules.push_back(0);
+		}
+	}
+	// print_AGR(agr);
+
+	uint num_recomputations = 0;
+	vector<NSDIRule> D_set;
+	for (int i=input_br.size() - 101; i >= 0; --i) {
+		// cout << i << endl;
+		uint res_add = add_rule_to_groups(input_br[i], br, D_set, agr, bits_toremove, mode, max_D_size);
+		num_recomputations = num_recomputations + res_add;
+		// cout << "\t\tcurrent recomputations: " << num_recomputations << endl;
+	}
+	return num_recomputations;
 }
 
 int main(int argc, char* argv[]) {
@@ -251,6 +298,7 @@ int main(int argc, char* argv[]) {
 	    ("help,?", "produce help message")
 	    ("max_width,w", po::value<int>(&max_width)->default_value(-1), "max group width in bits")
 	    ("mode,m", po::value<int>(&mode)->default_value(1), "mode")
+	    ("beta,t", po::value<uint>(&beta)->default_value(1), "beta")
 	    ("d_size,d", po::value<uint>(&D_size)->default_value(0), "size of D")
 	    ("input,i", po::value<string>(&in_fname)->default_value(""), "input file")
 	    ("ingress,r", po::value<string>(&ingress_fname)->default_value(""), "input file for the ingress part of the classifier")
@@ -258,6 +306,7 @@ int main(int argc, char* argv[]) {
 	    ("egress1,1", po::value<string>(&egress1_fname)->default_value(""), "input file for the egress part 1 of the classifier")
 	    ("nobinary,b", "do not apply binary reduction before first iteration")
 	    ("addrandom,a", "add random bits and output the result")
+	    ("tablerow,2", "do a whole table row for the experiments")
 	    ("readbinary,c", "read binary result immediately")
 	;
 
@@ -275,33 +324,31 @@ int main(int argc, char* argv[]) {
 	    return 1;
 	}
 
-	int bits_toremove = -1;
-	if (max_width > -1) {
-		bits_toremove = NSDI_BOOL_SIZE - max_width;
-	}
-
 	vector<NSDIRule> input_br;
 	boost::unordered_map< string, uint > actions;
 	vector<string> action_strings;
 	read_nsdi_file(in_fname, input_br, actions, action_strings);
 
-	vector<NSDIRule> br;
-	for (uint i=input_br.size() - 100; i<input_br.size(); ++i) {
-		br.push_back(input_br[i]);
+	cout << in_fname;
+	flush(cout);
+
+	if (vm.count("tablerow")) {
+		for (uint beta : { 0, 2, 4 }) {
+			for (uint max_width : { 13, 16, 24 }) {
+				for (uint D_size : { 0, 20, 50 }) {
+					uint num_recomputations = get_recomputations(input_br, beta, max_width, D_size);
+					cout << " & " << num_recomputations;
+					flush(cout);
+				}
+			}
+		}
+	} else {
+		uint num_recomputations = get_recomputations(input_br, beta, max_width, D_size);
+		cout << num_recomputations;
 	}
 
-	AllGroupsResult agr = recompute_groups(br, bits_toremove);
-	print_AGR(agr);
+	cout << "\\\\\n";
 
-	uint num_recomputations = 0;
-	vector<NSDIRule> D_set;
-	for (int i=input_br.size() - 101; i >= 0; --i) {
-		cout << i << endl;
-		uint res_add = add_rule_to_groups(input_br[i], br, D_set, agr, bits_toremove, mode);
-		num_recomputations = num_recomputations + res_add;
-		cout << "\t\tcurrent recomputations: " << num_recomputations << endl;
-	}
-	cout << "Total recomputations: " << num_recomputations << endl;
 	exit(0);
 }
 
