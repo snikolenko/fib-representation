@@ -363,8 +363,8 @@ int main(int argc, char* argv[]) {
 				for (uint D_size : { 100, 200, 500 }) {
 
 					vector<uint> v;
-					for (uint iRun=0; iRun<10; iRun++) {
-						random_shuffle( input_br.begin(), input_br.end() );
+					random_shuffle( input_br.begin(), input_br.end() );
+					for (uint iRun=0; iRun<6; iRun++) {
 						uint num_recomputations;
 						if (NSDI_BOOL_SIZE == 128) {
 							num_recomputations = get_recomputations(input_br, cur_beta, max_width, D_size);
