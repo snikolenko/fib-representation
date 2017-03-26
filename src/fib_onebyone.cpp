@@ -308,6 +308,7 @@ int main(int argc, char* argv[]) {
 	    ("addrandom,a", "add random bits and output the result")
 	    ("tablerow,2", "do a whole table row for the experiments")
 	    ("tablerow2,3", "do a whole table row for the experiments -- 2")
+	    ("tablerow3,4", "do a whole table row for the experiments -- 3")
 	    ("readbinary,c", "read binary result immediately")
 	;
 
@@ -346,7 +347,27 @@ int main(int argc, char* argv[]) {
 	} else if (vm.count("tablerow2")) {
 		for (uint beta : { 4 }) {
 			for (uint max_width : { 13, 16, 24 }) {
-				for (uint D_size : { 0, 20, 50 }) {
+				for (uint D_size : { 1000, 2000, 5000 }) {
+					uint num_recomputations = get_recomputations(input_br, beta, max_width, D_size);
+					cout << " & " << num_recomputations;
+					flush(cout);
+				}
+			}
+		}
+	} else if (vm.count("tablerow3")) {
+		for (uint cur_beta : { beta }) {
+			for (uint max_width : { 13, 16, 24 }) {
+				for (uint D_size : { 1000, 2000, 5000 }) {
+					uint num_recomputations = get_recomputations(input_br, cur_beta, max_width, D_size);
+					cout << " & " << num_recomputations;
+					flush(cout);
+				}
+			}
+		}
+	} else if (vm.count("tablerow3")) {
+		for (uint beta : { 8 }) {
+			for (uint max_width : { 13, 16, 24 }) {
+				for (uint D_size : { 1000, 2000, 5000 }) {
 					uint num_recomputations = get_recomputations(input_br, beta, max_width, D_size);
 					cout << " & " << num_recomputations;
 					flush(cout);

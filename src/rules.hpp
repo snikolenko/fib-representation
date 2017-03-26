@@ -9,9 +9,9 @@
 
 #define NSDI_NUM_FIELDS 1
 
-// #define NSDI_BOOL_SIZE 32
-#define NSDI_BOOL_SIZE 128
-#define RANDOM_PADDING
+#define NSDI_BOOL_SIZE 32
+// #define NSDI_BOOL_SIZE 128
+// #define RANDOM_PADDING
 
 #define NSDI_BOOL_SIZE_IPV6 128
 
