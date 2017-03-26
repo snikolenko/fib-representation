@@ -360,7 +360,7 @@ int main(int argc, char* argv[]) {
 	if (vm.count("random")) {
 		for (uint cur_beta : { 1, 2, 4 }) {
 			for (uint max_width : { 13, 16, 24 }) {
-				for (uint D_size : { 500, 1000, 2000 }) {
+				for (uint D_size : { 100, 500, 1000 }) {
 					vector<uint> v;
 					for (uint iRun=0; iRun<6; iRun++) {
 						random_shuffle( input_br.begin(), input_br.end() );
