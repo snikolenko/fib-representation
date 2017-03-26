@@ -358,7 +358,7 @@ int main(int argc, char* argv[]) {
 	flush(cout);
 
 	if (vm.count("random")) {
-		for (uint cur_beta : { beta }) {
+		for (uint cur_beta : { 1, 2, 4 }) {
 			for (uint max_width : { 13, 16, 24 }) {
 				for (uint D_size : { 500, 1000, 2000 }) {
 					vector<uint> v;
@@ -381,7 +381,7 @@ int main(int argc, char* argv[]) {
 					double sq_sum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
 					double stddev = std::sqrt(sq_sum / v.size() - mean * mean);
 
-					cout << " & $" << mean << "\\pm " << setprecision(2) << stddev << "$";
+					cout << " & $" << setprecision(2) << mean << "\\pm " << setprecision(2) << stddev << "$";
 					flush(cout);
 				}
 			}
