@@ -360,11 +360,10 @@ int main(int argc, char* argv[]) {
 	if (vm.count("random")) {
 		for (uint cur_beta : { beta }) {
 			for (uint max_width : { 13, 16, 24 }) {
-				for (uint D_size : { 200, 500, 1000 }) {
-
+				for (uint D_size : { 500, 1000, 2000 }) {
 					vector<uint> v;
-					random_shuffle( input_br.begin(), input_br.end() );
 					for (uint iRun=0; iRun<6; iRun++) {
+						random_shuffle( input_br.begin(), input_br.end() );
 						uint num_recomputations;
 						if (NSDI_BOOL_SIZE == 128) {
 							num_recomputations = get_recomputations(input_br, cur_beta, max_width, D_size);
