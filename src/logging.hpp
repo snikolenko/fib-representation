@@ -65,3 +65,4 @@ perf_counter timer;
 
 // #define LOG(msg) cerr << "[" << str(boost::format("%14s %5s") % human_readable_time(timer.time()) % human_readable_memory(get_max_rss())) << "]\t" << msg << endl;
 #define LOG(msg) ;
+#define LLOG(msg) cerr << "[" << str(boost::format("%14s %5s") % human_readable_time(timer.time()) % human_readable_memory(get_max_rss())) << "]\t" << msg << endl;

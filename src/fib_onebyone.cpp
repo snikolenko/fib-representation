@@ -2,6 +2,8 @@
 
 using namespace std;
 
+#include <algorithm>
+
 namespace po = boost::program_options;
 
 int max_width = -1;
@@ -17,6 +19,7 @@ bool read_binary = false;
 
 uint D_size = 0;
 uint beta = 0;
+uint random_size = 50000;
 int mode = 1;
 
 void print_result(const string & key, const string & value) {
@@ -137,6 +140,7 @@ OneOptGroupResult process_one_optgroup_L(vector<NSDIRule> & br, int num_bits_tor
 typedef struct  {
 	vector<uint> widths, num_rules;
 	std::vector< std::vector<bool> > group_bits;
+	// std::vector< std::vector<uint> > group_bitindices;
 	std::vector<int> group_ids;
 } AllGroupsResult;
 
@@ -188,6 +192,13 @@ AllGroupsResult	recompute_groups(const vector<NSDIRule> & input_br, uint bits_to
 
 		// add the current group to AllGroupsResult
 		res.group_bits.push_back( ogres.group_bits );
+		// vector<uint> cur_bitindices;
+		// for (uint i=0; i<NSDI_BOOL_SIZE; ++i) {
+		// 	if (ogres.group_bits[i]) {
+		// 		cur_bitindices.push_back( i );
+		// 	}
+		// }
+		// res.group_bitindices.push_back( cur_bitindices );
 		res.widths.push_back( accumulate(ogres.group_bits.begin(), ogres.group_bits.end(), 0) );
 		res.num_rules.push_back( accumulate(ogres.subset_i.begin(), ogres.subset_i.end(), 0) );
 		for (uint i=0; i<cur_br.size(); ++i) {
@@ -224,6 +235,7 @@ uint add_rule_to_groups(const NSDIRule & r, vector<NSDIRule> & br, vector<NSDIRu
 		bool can_add = true;
 		for (uint i=0; i<agr.group_ids.size(); ++i) {
 			// check intersections with every rule in the group w.r.t. the current group bits
+			// if ( (agr.group_ids[i] == (int)iGroup) && r.intersects_in_mode_masked_above(br[i], agr.group_bitindices[iGroup], mode) ) {
 			if ( (agr.group_ids[i] == (int)iGroup) && r.intersects_in_mode_masked_above(br[i], agr.group_bits[iGroup], mode) ) {
 				// cout << "Group " << iGroup << ": intersection with rule\n" << br[i].print(agr.group_bits[iGroup]) << endl;
 				can_add = false;
@@ -246,11 +258,11 @@ uint add_rule_to_groups(const NSDIRule & r, vector<NSDIRule> & br, vector<NSDIRu
 		return 0;
 	}
 	// if couldn't, recompute everything
-	// cout << "Recomputing everything! D_set size = " << D_set.size() << endl;
+	cout << "Recomputing everything! D_set size = " << D_set.size() << endl;
 	br.push_back(r);
 	br.insert(br.end(), D_set.begin(), D_set.end());
 	agr = recompute_groups(br, bits_toremove);
-	// print_AGR(agr);
+	print_AGR(agr);
 	return 1;
 }
 
@@ -269,10 +281,13 @@ uint get_recomputations(const vector<NSDIRule> & input_br, uint beta, uint max_w
 	if (agr.group_bits.size() < beta) {
 		for (uint iGroup=agr.group_bits.size(); iGroup < beta; ++iGroup) {
 			vector<bool> new_groupbits(NSDI_BOOL_SIZE, false);
+			vector<uint> new_groupbitindices;
 			for (uint i=0; i<max_width; ++i) {
 				new_groupbits[i] = true;
+				// new_groupbitindices.push_back(i);
 			}
 			agr.group_bits.push_back(new_groupbits);
+			// agr.group_bitindices.push_back(new_groupbitindices);
 			agr.widths.push_back(max_width);
 			agr.num_rules.push_back(0);
 		}
@@ -282,9 +297,14 @@ uint get_recomputations(const vector<NSDIRule> & input_br, uint beta, uint max_w
 	uint num_recomputations = 0;
 	vector<NSDIRule> D_set;
 	for (int i=input_br.size() - 101; i >= 0; --i) {
-		// cout << i << endl;
+		if (i % 10000 == 0) {
+			LLOG(i << "  |D|=" << D_set.size());
+		}
 		uint res_add = add_rule_to_groups(input_br[i], br, D_set, agr, bits_toremove, mode, max_D_size);
 		num_recomputations = num_recomputations + res_add;
+		if (res_add == 1) {
+			cout << "recomp. # " << num_recomputations << " at step " << i << endl;
+		}
 		// cout << "\t\tcurrent recomputations: " << num_recomputations << endl;
 	}
 	return num_recomputations;
@@ -309,6 +329,8 @@ int main(int argc, char* argv[]) {
 	    ("tablerow,2", "do a whole table row for the experiments")
 	    ("tablerow2,3", "do a whole table row for the experiments -- 2")
 	    ("tablerow3,4", "do a whole table row for the experiments -- 3")
+	    ("random,9", "do randomized trials for 50K each")
+	    ("randsize,8", po::value<uint>(&random_size)->default_value(50000), "beta")
 	    ("readbinary,c", "read binary result immediately")
 	;
 
@@ -333,6 +355,26 @@ int main(int argc, char* argv[]) {
 
 	cout << in_fname;
 	flush(cout);
+
+	if (vm.count("random")) {
+		vector<uint> v;
+		for (uint iRun=0; iRun<10; iRun++) {
+			random_shuffle( input_br.begin(), input_br.end() );
+			vector<NSDIRule> current_br( input_br.begin(), input_br.begin() + random_size );
+			uint num_recomputations = get_recomputations(current_br, beta, max_width, D_size);
+			v.push_back(num_recomputations);
+			cout << " " << num_recomputations << endl;
+		}
+
+		double sum = std::accumulate(v.begin(), v.end(), 0.0);
+		double mean = sum / v.size();
+
+		double sq_sum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
+		double stdev = std::sqrt(sq_sum / v.size() - mean * mean);
+
+		cout << "mean = " << mean << "\tstddev = " << stdev << endl;
+		exit(0);
+	}
 
 	if (vm.count("tablerow")) {
 		for (uint beta : { 0, 2, 4 }) {
