@@ -190,20 +190,34 @@ void apply_binary_rules(vector<NSDIRule> & br) {
 	}
 }
 
-uint process_one_optgroup(vector<NSDIRule> & br, std::vector<bool> & subset_d, int num_bits_toremove = -1, uint mode = 0, bool do_binary = true, bool first_iteration = false) {
-	if (br.size() == 0) return max(0, num_bits_toremove);
+
+typedef struct  {
+	std::vector<bool> subset_d;
+	std::vector<bool> group_bits;
+	std::vector<bool> subset_i;
+	uint opt_numbits;
+} OneOptGroupResult;
+
+OneOptGroupResult process_one_optgroup_full(vector<NSDIRule> & br, std::vector<bool> & subset_d, int num_bits_toremove = -1, uint mode = 0, bool do_binary = true, bool first_iteration = false) {
+	OneOptGroupResult res;
+	if (br.size() == 0) {
+		res.opt_numbits = max(0, num_bits_toremove);
+		return res;
+	}
 	if (do_binary) {
 		apply_binary_rules(br);
 	}
 	uint min_size = br.size() * NSDI_BOOL_SIZE;
 	uint opt_numbits = 0;
-	vector<bool> opt_subset_d(br.size(), false);
-	std::vector<bool> removed_bits(NSDI_BOOL_SIZE, false);
+	res.subset_d = vector<bool>(br.size(), false);
+	res.subset_i = vector<bool>(br.size(), true);
+	vector<bool> opt_subset_d = vector<bool>(br.size(), false);
+	vector<bool> removed_bits(NSDI_BOOL_SIZE, false);
 	bool prev_size_increase = false;
 	uint cur_size = br.size() * NSDI_BOOL_SIZE;
 	for (int iIter=0; iIter<NSDI_BOOL_SIZE; ++iIter) {
 		uint cur_bits_removed = accumulate(removed_bits.begin(), removed_bits.end(), 0);
-		uint cur_d_size = accumulate(subset_d.begin(), subset_d.end(), 0);
+		uint cur_d_size = accumulate(res.subset_d.begin(), res.subset_d.end(), 0);
 		int num_bits = cur_bits_removed;
 
 		uint cur_size_new = (NSDI_BOOL_SIZE * br.size() - (br.size() - cur_d_size) * cur_bits_removed );
@@ -221,7 +235,7 @@ uint process_one_optgroup(vector<NSDIRule> & br, std::vector<bool> & subset_d, i
 			opt_numbits = num_bits;
 			min_size = cur_size;
 			for (uint j=0; j<br.size(); ++j) {
-				opt_subset_d[j] = subset_d[j];
+				opt_subset_d[j] = res.subset_d[j];
 			}
 		}
 		vector< vector<bool> > blockers = find_relaxed_blocking_subsets(br, removed_bits, mode);
@@ -249,17 +263,32 @@ uint process_one_optgroup(vector<NSDIRule> & br, std::vector<bool> & subset_d, i
 				removed_bits[zero_blockers[i]] = true;
 			}
 		} else {
-			// LOG("Next bit to remove is " << min_blocker_ind << " with |D| = " << min_blocker_size);
+			LOG("Next bit to remove is " << min_blocker_ind << " with |D| = " << min_blocker_size);
 			removed_bits[min_blocker_ind] = true;
 			for (uint i=0; i<br.size(); ++i) {
 				if (blockers[i][min_blocker_ind]) {
-					subset_d[i] = true;
+					res.subset_d[i] = true;
 				}
 			}
 		}
 	}
-	subset_d.swap(opt_subset_d);
-	return opt_numbits;
+	res.subset_d.swap(opt_subset_d);
+	for (uint i=0; i<br.size(); ++i) {
+		res.subset_i[i] = (res.subset_i[i] && (!res.subset_d[i]));
+	}
+	res.opt_numbits = opt_numbits;
+	res.group_bits = std::vector<bool>(NSDI_BOOL_SIZE, true);
+	for (uint i=0; i<NSDI_BOOL_SIZE; ++i) {
+		res.group_bits[i] = !removed_bits[i];
+	}
+	return res;
+}
+
+uint process_one_optgroup(vector<NSDIRule> & br, std::vector<bool> & subset_d, int num_bits_toremove = -1, uint mode = 0, bool do_binary = true, bool first_iteration = false) {
+	OneOptGroupResult res = process_one_optgroup_full(br, subset_d, num_bits_toremove, mode, do_binary, first_iteration);
+	// cout << "\t|I| = " << accumulate(res.subset_i.begin(), res.subset_i.end(), 0) << "\t|D| = " << accumulate(res.subset_d.begin(), res.subset_d.end(), 0) << endl;
+	subset_d.swap(res.subset_d);
+	return res.opt_numbits;
 }
 
 void process_one_file_optgroup(const string & fname, int num_bits_toremove = -1, uint mode = 0, bool do_first_boolean = true, bool randomize_and_output = false, bool read_binary = false) {
@@ -295,17 +324,21 @@ void process_one_file_optgroup(const string & fname, int num_bits_toremove = -1,
 	LOG("[RESULT] width " << (NSDI_BOOL_SIZE-num_removed_bits) << " bits, " << cur_subset_d_numrules << " rules left, size " << cur_size << ".");
 	cout << " & " << (NSDI_BOOL_SIZE-num_removed_bits) << " & " << cur_subset_i_numrules << " & " << cur_subset_d_numrules <<  " & " << (cur_size  / 100) / 10.0;
 	uint numGroups = 0;
+
 	for (uint numIter=0; numIter<1000; ++numIter) {
 		vector<NSDIRule> cur_br;
 		for (uint i=0; i<br.size(); ++i) {
-			if (subset_d[i]) cur_br.push_back(br[i]);
+			if (subset_d[i]) {
+				cur_br.push_back(br[i]);
+			}
 		}
 		subset_d = std::vector<bool>(cur_br.size(), false);
 		br.swap(cur_br);
 		apply_binary_rules(br);
 
 		// find the next optgroup
-		uint cur_removed_bits = process_one_optgroup(br, subset_d, num_bits_toremove, mode, false, false);
+		OneOptGroupResult oogres = process_one_optgroup_full(br, subset_d, num_bits_toremove, mode, false, false);
+		uint cur_removed_bits = oogres.opt_numbits;
 
 		// update D and I subset sizes
 		cur_subset_d_numrules = accumulate(subset_d.begin(), subset_d.end(), 0);

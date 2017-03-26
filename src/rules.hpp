@@ -520,6 +520,14 @@ public:
 		return res;
 	}
 
+	string print(const vector<bool> & mask) const {
+		string res;
+		for (size_t i=0; i<NSDI_BOOL_SIZE; ++i) {
+			res +=  mask[i] ? ( x[i] == 0 ? '0' : ( x[i] == 1 ? '1' : '*') ) : '.';
+		}
+		return res;
+	}
+
 	~NSDIRule() {
 		// delete [] x;
 	}
@@ -600,6 +608,22 @@ public:
 			LOG("bit " << first_difference << ":\t" << print() << "\t" << b.print());
 			mask[first_difference] = false;
 		}
+	}
+
+	// modes:
+	// 0 -- relaxed SE
+	// 1 -- action order independence
+	// 2 -- filter order independence
+	bool intersects_in_mode_masked_above(const NSDIRule & b, const vector<bool> & mask, uint mode=0) const {
+		if ( (mode == 0 || mode == 1) && a == b.a) return false;
+		for (size_t i=0; i<NSDI_BOOL_SIZE; ++i) {
+			if (!mask[i]) continue;
+			if ( ((mode == 0) && (( (b.x[i] == 1) && ( x[i] == 0 || x[i] == '*') ) || ( (b.x[i] == 0) && ( x[i] == 1 || x[i] == '*') )))
+			|| ( (mode > 0) && ((x[i] == 0 && b.x[i] == 1) || (x[i] == 1 && b.x[i] == 0)) )) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	void mark_relaxed_intersections_masked(const NSDIRule & b,

@@ -34,6 +34,8 @@ typedef struct  {
 	uint num_rules_final, num_rules_1group, width_1group, I_1group, D_1group, num_groups;
 	float size_final, size_1group, egress_fpcheck_size;
 	vector<uint> widths, Is, Ds;
+	std::vector< std::vector<bool> > group_bits;
+	std::vector<int> group_ids;
 } OneModeResult;
 
 
@@ -52,7 +54,7 @@ void print_OMR(const string & prefix, const OneModeResult & omr) {
 	}
 }
 
-OneModeResult process_one_mode(const vector<NSDIRule> & input_br, uint mode, int num_bits_toremove) {
+OneModeResult process_one_mode(const vector<NSDIRule> & input_br, uint mode, int num_bits_toremove, bool do_boolean = true) {
 	vector<NSDIRule> br;
 	OneModeResult res = {};
 	for (uint i=0; i<input_br.size(); ++i) {
@@ -64,6 +66,13 @@ OneModeResult process_one_mode(const vector<NSDIRule> & input_br, uint mode, int
 	std::vector<bool> subset_d(br.size(), false);
 
 	uint egress_fpcheck_size = 0;
+	
+	// indices for the current rules
+	vector<uint> br_indices;
+	for (uint i=0; i<br.size(); ++i) {
+		br_indices.push_back(i);
+	}
+
 	uint num_removed_bits = process_one_optgroup(br, subset_d, num_bits_toremove, mode, false, true);
 	uint cur_subset_d_numrules = accumulate(subset_d.begin(), subset_d.end(), 0);
 	uint cur_subset_i_numrules = br.size() - cur_subset_d_numrules;
@@ -78,17 +87,37 @@ OneModeResult process_one_mode(const vector<NSDIRule> & input_br, uint mode, int
 	res.Is.push_back(cur_subset_i_numrules);
 	res.Ds.push_back(cur_subset_d_numrules);
 	res.size_1group = egress_fpcheck_size / 1000.;
+	res.group_ids = vector<int>(br.size(), -1);
+	res.group_bits = std::vector<std::vector<bool> >();
+
 	for (uint numIter=0; numIter<1000; ++numIter) {
 		vector<NSDIRule> cur_br;
+		vector<uint> cur_br_indices;
 		for (uint i=0; i<br.size(); ++i) {
-			if (subset_d[i]) cur_br.push_back(br[i]);
+			if (subset_d[i]) {
+				cur_br.push_back(br[i]);
+				cur_br_indices.push_back(br_indices[i]);
+			}
 		}
 		subset_d = std::vector<bool>(cur_br.size(), false);
 		br.swap(cur_br);
-		apply_binary_rules(br);
+		br_indices.swap(cur_br_indices);
+		if (do_boolean) {
+			apply_binary_rules(br);
+		}
 
 		// find the next optgroup
-		uint cur_removed_bits = process_one_optgroup(br, subset_d, num_bits_toremove, mode, false, false);
+		OneOptGroupResult oogres = process_one_optgroup_full(br, subset_d, num_bits_toremove, mode, false, false);
+		uint cur_removed_bits = oogres.opt_numbits;
+		res.group_bits.push_back( vector<bool>(oogres.group_bits.begin(), oogres.group_bits.end()) );
+		for (uint i=0; i<br.size(); ++i) {
+			if (oogres.subset_i[i]) {
+				res.group_ids[ br_indices[i] ] = numIter + 1;
+			}
+		}
+
+		// find the next optgroup
+		// uint cur_removed_bits = process_one_optgroup(br, subset_d, num_bits_toremove, mode, false, false);
 
 		// update D and I subset sizes
 		cur_subset_d_numrules = accumulate(subset_d.begin(), subset_d.end(), 0);
@@ -227,6 +256,17 @@ int main(int argc, char* argv[]) {
 		bits_toremove = NSDI_BOOL_SIZE - max_width;
 	}
 
-	process_file_allmodes(in_fname, bits_toremove);
+	vector<NSDIRule> input_br;
+	boost::unordered_map< string, uint > actions;
+	vector<string> action_strings;
+	read_nsdi_file(in_fname, input_br, actions, action_strings);
+
+
+
+	OneModeResult omr = process_one_mode(input_br, 1, bits_toremove);
+	for (auto w : omr.widths) {
+		cout << w << endl;
+	}
+	// process_file_allmodes(in_fname, bits_toremove);
 }
 
