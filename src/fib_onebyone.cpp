@@ -360,8 +360,13 @@ int main(int argc, char* argv[]) {
 		vector<uint> v;
 		for (uint iRun=0; iRun<10; iRun++) {
 			random_shuffle( input_br.begin(), input_br.end() );
-			vector<NSDIRule> current_br( input_br.begin(), input_br.begin() + random_size );
-			uint num_recomputations = get_recomputations(current_br, beta, max_width, D_size);
+			uint num_recomputations;
+			if (NSDI_BOOL_SIZE == 128) {
+				num_recomputations = get_recomputations(input_br, beta, max_width, D_size);
+			} else {
+				vector<NSDIRule> current_br( input_br.begin(), input_br.begin() + random_size );
+				num_recomputations = get_recomputations(current_br, beta, max_width, D_size);
+			}
 			v.push_back(num_recomputations);
 			cout << " " << num_recomputations << endl;
 		}
