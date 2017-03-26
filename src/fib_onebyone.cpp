@@ -255,17 +255,17 @@ uint add_rule_to_groups(const NSDIRule & r, vector<NSDIRule> & br, vector<NSDIRu
 }
 
 uint get_recomputations(const vector<NSDIRule> & input_br, uint beta, uint max_width, uint max_D_size) {
-	int bits_toremove = -1;
-	if (max_width > -1) {
-		bits_toremove = NSDI_BOOL_SIZE - max_width;
-	}
+	int bits_toremove = NSDI_BOOL_SIZE - max_width;
 
 	vector<NSDIRule> br;
 	for (uint i=input_br.size() - 100; i<input_br.size(); ++i) {
 		br.push_back(input_br[i]);
 	}
 
+	// cout << "Beta=" << beta << "\tmax.wid=" << max_width << "\tmax|D|=" << max_D_size << endl;
+
 	AllGroupsResult agr = recompute_groups(br, bits_toremove);
+	// print_AGR(agr);
 	if (agr.group_bits.size() < beta) {
 		for (uint iGroup=agr.group_bits.size(); iGroup < beta; ++iGroup) {
 			vector<bool> new_groupbits(NSDI_BOOL_SIZE, false);
