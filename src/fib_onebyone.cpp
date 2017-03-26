@@ -258,12 +258,12 @@ uint add_rule_to_groups(const NSDIRule & r, vector<NSDIRule> & br, vector<NSDIRu
 		return 0;
 	}
 	// if couldn't, recompute everything
-	cout << "Recomputing everything! D_set size = " << D_set.size() << endl;
+	// cout << "Recomputing everything! D_set size = " << D_set.size() << endl;
 	br.push_back(r);
 	br.insert(br.end(), D_set.begin(), D_set.end());
 	D_set.clear();
 	agr = recompute_groups(br, bits_toremove);
-	print_AGR(agr);
+	// print_AGR(agr);
 	return 1;
 }
 
@@ -299,12 +299,12 @@ uint get_recomputations(const vector<NSDIRule> & input_br, uint beta, uint max_w
 	vector<NSDIRule> D_set;
 	for (int i=input_br.size() - 101; i >= 0; --i) {
 		if (i % 10000 == 0) {
-			LLOG(i << "  |D|=" << D_set.size());
+			// LLOG(i << "  |D|=" << D_set.size());
 		}
 		uint res_add = add_rule_to_groups(input_br[i], br, D_set, agr, bits_toremove, mode, max_D_size);
 		num_recomputations = num_recomputations + res_add;
 		if (res_add == 1) {
-			cout << "recomp. # " << num_recomputations << " at step " << i << endl;
+			// cout << "recomp. # " << num_recomputations << " at step " << i << endl;
 		}
 		// cout << "\t\tcurrent recomputations: " << num_recomputations << endl;
 	}
@@ -358,27 +358,36 @@ int main(int argc, char* argv[]) {
 	flush(cout);
 
 	if (vm.count("random")) {
-		vector<uint> v;
-		for (uint iRun=0; iRun<10; iRun++) {
-			random_shuffle( input_br.begin(), input_br.end() );
-			uint num_recomputations;
-			if (NSDI_BOOL_SIZE == 128) {
-				num_recomputations = get_recomputations(input_br, beta, max_width, D_size);
-			} else {
-				vector<NSDIRule> current_br( input_br.begin(), input_br.begin() + random_size );
-				num_recomputations = get_recomputations(current_br, beta, max_width, D_size);
+		for (uint cur_beta : { beta }) {
+			for (uint max_width : { 13, 16, 24 }) {
+				for (uint D_size : { 100, 200, 500 }) {
+
+					vector<uint> v;
+					for (uint iRun=0; iRun<10; iRun++) {
+						random_shuffle( input_br.begin(), input_br.end() );
+						uint num_recomputations;
+						if (NSDI_BOOL_SIZE == 128) {
+							num_recomputations = get_recomputations(input_br, cur_beta, max_width, D_size);
+						} else {
+							vector<NSDIRule> current_br( input_br.begin(), input_br.begin() + random_size );
+							num_recomputations = get_recomputations(current_br, beta, max_width, D_size);
+						}
+						v.push_back(num_recomputations);
+						// cout << " " << num_recomputations << endl;
+					}
+
+					double sum = std::accumulate(v.begin(), v.end(), 0.0);
+					double mean = sum / v.size();
+
+					double sq_sum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
+					double stddev = std::sqrt(sq_sum / v.size() - mean * mean);
+
+					cout << " & $" << mean << "\\pm " << setprecision(2) << stddev << "$";
+					flush(cout);
+				}
 			}
-			v.push_back(num_recomputations);
-			cout << " " << num_recomputations << endl;
 		}
 
-		double sum = std::accumulate(v.begin(), v.end(), 0.0);
-		double mean = sum / v.size();
-
-		double sq_sum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
-		double stdev = std::sqrt(sq_sum / v.size() - mean * mean);
-
-		cout << "mean = " << mean << "\tstddev = " << stdev << endl;
 		exit(0);
 	}
 
