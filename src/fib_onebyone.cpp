@@ -307,6 +307,7 @@ int main(int argc, char* argv[]) {
 	    ("nobinary,b", "do not apply binary reduction before first iteration")
 	    ("addrandom,a", "add random bits and output the result")
 	    ("tablerow,2", "do a whole table row for the experiments")
+	    ("tablerow2,3", "do a whole table row for the experiments -- 2")
 	    ("readbinary,c", "read binary result immediately")
 	;
 
@@ -334,6 +335,16 @@ int main(int argc, char* argv[]) {
 
 	if (vm.count("tablerow")) {
 		for (uint beta : { 0, 2, 4 }) {
+			for (uint max_width : { 13, 16, 24 }) {
+				for (uint D_size : { 0, 20, 50 }) {
+					uint num_recomputations = get_recomputations(input_br, beta, max_width, D_size);
+					cout << " & " << num_recomputations;
+					flush(cout);
+				}
+			}
+		}
+	} else if (vm.count("tablerow2")) {
+		for (uint beta : { 4 }) {
 			for (uint max_width : { 13, 16, 24 }) {
 				for (uint D_size : { 0, 20, 50 }) {
 					uint num_recomputations = get_recomputations(input_br, beta, max_width, D_size);
