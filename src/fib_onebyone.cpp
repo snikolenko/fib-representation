@@ -261,6 +261,7 @@ uint add_rule_to_groups(const NSDIRule & r, vector<NSDIRule> & br, vector<NSDIRu
 	cout << "Recomputing everything! D_set size = " << D_set.size() << endl;
 	br.push_back(r);
 	br.insert(br.end(), D_set.begin(), D_set.end());
+	D_set.clear();
 	agr = recompute_groups(br, bits_toremove);
 	print_AGR(agr);
 	return 1;
